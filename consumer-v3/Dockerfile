@@ -1,12 +1,17 @@
-FROM eclipse-temurin:17-jdk-alpine AS build
+# Build context must be the repo root (see docker-compose.yml):
+#   docker build -t consumer -f consumer-v3/Dockerfile .
+FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
-COPY ../pom.xml ../pom.xml
+# All module poms are needed so Maven can resolve the multi-module reactor
 COPY pom.xml .
-COPY src ./src
-RUN apk add --no-cache maven && mvn clean package -DskipTests -pl . -am
+COPY producer/pom.xml producer/
+COPY consumer-v3/pom.xml consumer-v3/
+COPY test-client/pom.xml test-client/
+COPY consumer-v3/src consumer-v3/src
+RUN mvn -q clean package -DskipTests -pl consumer-v3 -am
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=build /app/target/consumer-1.0-SNAPSHOT.jar app.jar
+COPY --from=build /app/consumer-v3/target/consumer-1.0-SNAPSHOT.jar app.jar
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
